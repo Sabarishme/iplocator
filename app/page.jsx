@@ -1,42 +1,51 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { Globe, Search, Download, Trash2, RefreshCw } from 'lucide-react';
+import { Globe, Search, Download, Trash2, RefreshCw, Wand2 } from 'lucide-react';
 
 export default function Home() {
   const [inputText, setInputText] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Helper to extract clean IP from raw line
-  const cleanIP = (raw) => {
+  // Helper to extract clean IP from a single line
+  const extractCleanIP = (raw) => {
     let str = raw.trim();
-    if (!str) return null;
+    if (!str) return '';
 
-    // IPv6 inside brackets: [2001:db8::1]:8080 or [2001:db8::1]
+    // Handle IPv6 in brackets: [2001:db8::1]:8080 -> 2001:db8::1
     if (str.includes('[')) {
       const match = str.match(/\[([a-fA-F0-9:]+)\]/);
       if (match) return match[1];
     }
 
-    // IPv4 with port: 103.101.54.181:58050
+    // Handle IPv4 with port: 103.101.54.181:58050 -> 103.101.54.181
     if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(str)) {
       return str.split(':')[0];
     }
 
-    // Standard IPv6 without brackets
+    // Handle standard IPv6 with port: 2001:db8::1:8080 -> 2001:db8::1
     if (str.includes(':')) {
       const parts = str.split(':');
       if (parts.length > 2 && /^\d{1,5}$/.test(parts[parts.length - 1])) {
         parts.pop();
         return parts.join(':');
       }
-      return str;
     }
 
     return str;
   };
 
-  // Real-time parsing and validation for the status counters
+  // Feature: Cleans input in text box directly
+  const handleCleanText = () => {
+    const lines = inputText.split('\n');
+    const cleanedList = lines
+      .map(line => extractCleanIP(line))
+      .filter(ip => ip.length > 0);
+    
+    setInputText(cleanedList.join('\n'));
+  };
+
+  // Real-time validation for status counters
   const { validIPs, invalidEntries } = useMemo(() => {
     const rawLines = inputText.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
     const valid = [];
@@ -46,7 +55,7 @@ export default function Home() {
     const ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$\vert{}^([0-9a-fA-F]{1,4}:){1,7}:\vert{}^:[0-9a-fA-F]{1,4}\vert{}(?::[0-9a-fA-F]{1,4}){1,7}$/;
 
     rawLines.forEach((line) => {
-      const extracted = cleanIP(line);
+      const extracted = extractCleanIP(line);
       if (extracted && (ipv4Regex.test(extracted) || ipv6Regex.test(extracted))) {
         if (!valid.includes(extracted)) valid.push(extracted);
       } else {
@@ -119,9 +128,16 @@ export default function Home() {
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-md font-semibold text-slate-200">Paste Bulk IP Addresses</h2>
-              <p className="text-xs text-slate-400">Accepts IPv4 and IPv6 addresses with or without ports (line-by-line).</p>
+              <p className="text-xs text-slate-400">Accepts IPv4 and IPv6 addresses line-by-line.</p>
             </div>
             <div className="flex gap-2">
+              <button
+                onClick={handleCleanText}
+                disabled={!inputText.trim()}
+                className="text-xs bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/50 px-3 py-1.5 rounded-md transition flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Wand2 className="w-3.5 h-3.5" /> Clean IPs Only
+              </button>
               <button
                 onClick={() => setInputText(103.101.54.181:58050\n79.181.186.115:33945\n[2001:8a0:72fb:0:7d72:3e98:5f22:ebff]:9505)}
                 className="text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 px-3 py-1.5 rounded-md transition"
