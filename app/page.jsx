@@ -7,23 +7,19 @@ export default function Home() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Helper to extract clean IP from a single line
   const extractCleanIP = (raw) => {
     let str = raw.trim();
     if (!str) return '';
 
-    // Handle IPv6 in brackets: [2001:db8::1]:8080 -> 2001:db8::1
     if (str.includes('[')) {
       const match = str.match(/\[([a-fA-F0-9:]+)\]/);
       if (match) return match[1];
     }
 
-    // Handle IPv4 with port: 103.101.54.181:58050 -> 103.101.54.181
     if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(str)) {
       return str.split(':')[0];
     }
 
-    // Handle standard IPv6 with port: 2001:db8::1:8080 -> 2001:db8::1
     if (str.includes(':')) {
       const parts = str.split(':');
       if (parts.length > 2 && /^\d{1,5}$/.test(parts[parts.length - 1])) {
@@ -35,7 +31,6 @@ export default function Home() {
     return str;
   };
 
-  // Feature: Cleans input in text box directly
   const handleCleanText = () => {
     const lines = inputText.split('\n');
     const cleanedList = lines
@@ -45,7 +40,6 @@ export default function Home() {
     setInputText(cleanedList.join('\n'));
   };
 
-  // Real-time validation for status counters
   const { validIPs, invalidEntries } = useMemo(() => {
     const rawLines = inputText.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
     const valid = [];
