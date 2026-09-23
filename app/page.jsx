@@ -17,25 +17,11 @@ export default function Home() {
 
       let ip = line;
 
-      // Handle IPv6 inside brackets with port: [2800:300::1]:6692
-      if (line.startsWith('[')) {
-        const match = line.match(/^\[([a-fA-F0-9:]+)\](?::\d+)?$/);
-        if (match) {
-          ip = match[1];
-        }
-      } 
-      // Handle IPv4 with port: 122.60.224.71:38976
-      else if (line.includes('.')) {
+      if (line.includes('[')) {
+        const match = line.match(/\[([a-fA-F0-9:]+)\]/);
+        if (match) ip = match[1];
+      } else if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(line)) {
         ip = line.split(':')[0];
-      }
-      // Handle standard IPv6 with port: 2001:db8::1:8080
-      else if (line.includes(':')) {
-        const parts = line.split(':');
-        // If last part is a port number (5 digits or fewer)
-        if (parts.length > 2 && /^\d{1,5}$/.test(parts[parts.length - 1])) {
-          parts.pop();
-          ip = parts.join(':');
-        }
       }
 
       if (ip && !cleanedIPs.includes(ip)) {
@@ -49,7 +35,7 @@ export default function Home() {
   const handleLookup = async () => {
     const ipList = parseLineByLine(inputText);
     if (ipList.length === 0) {
-      alert('No valid IP addresses found line-by-line!');
+      alert('No valid IP addresses found!');
       return;
     }
 
@@ -113,7 +99,7 @@ export default function Home() {
           <textarea
             rows={10}
             className="w-full bg-slate-800 border border-slate-700 rounded-lg p-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder={122.60.224.71:38976\n[2800:300:6a13:2400:1525:346b:6388:213e]:6692\n31.217.177.134:12833}
+            placeholder={122.60.224.71:38976\n[2800:300:6a13:2400:1525:346b:6388:213e]:6692}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
           />
