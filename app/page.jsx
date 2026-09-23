@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Globe, Search, Download, Trash2, RefreshCw } from 'lucide-react';
 
 export default function Home() {
@@ -7,43 +7,64 @@ export default function Home() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const parseLineByLine = (text) => {
-    const lines = text.split('\n');
-    const cleanedIPs = [];
+  // Helper to extract clean IP from raw line
+  const cleanIP = (raw) => {
+    let str = raw.trim();
+    if (!str) return null;
 
-    for (let line of lines) {
-      line = line.trim();
-      if (!line) continue;
-
-      let ip = line;
-
-      if (line.includes('[')) {
-        const match = line.match(/\[([a-fA-F0-9:]+)\]/);
-        if (match) ip = match[1];
-      } else if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(line)) {
-        ip = line.split(':')[0];
-      }
-
-      if (ip && !cleanedIPs.includes(ip)) {
-        cleanedIPs.push(ip);
-      }
+    // IPv6 inside brackets: [2001:db8::1]:8080 or [2001:db8::1]
+    if (str.includes('[')) {
+      const match = str.match(/\[([a-fA-F0-9:]+)\]/);
+      if (match) return match[1];
     }
 
-    return cleanedIPs;
+    // IPv4 with port: 103.101.54.181:58050
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(str)) {
+      return str.split(':')[0];
+    }
+
+    // Standard IPv6 without brackets
+    if (str.includes(':')) {
+      const parts = str.split(':');
+      if (parts.length > 2 && /^\d{1,5}$/.test(parts[parts.length - 1])) {
+        parts.pop();
+        return parts.join(':');
+      }
+      return str;
+    }
+
+    return str;
   };
 
+  // Real-time parsing and validation for the status counters
+  const { validIPs, invalidEntries } = useMemo(() => {
+    const rawLines = inputText.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+    const valid = [];
+    const invalid = [];
+
+    const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    const ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$\vert{}^([0-9a-fA-F]{1,4}:){1,7}:\vert{}^:[0-9a-fA-F]{1,4}\vert{}(?::[0-9a-fA-F]{1,4}){1,7}$/;
+
+    rawLines.forEach((line) => {
+      const extracted = cleanIP(line);
+      if (extracted && (ipv4Regex.test(extracted) || ipv6Regex.test(extracted))) {
+        if (!valid.includes(extracted)) valid.push(extracted);
+      } else {
+        invalid.push(line);
+      }
+    });
+
+    return { validIPs: valid, invalidEntries: invalid };
+  }, [inputText]);
+
   const handleLookup = async () => {
-    const ipList = parseLineByLine(inputText);
-    if (ipList.length === 0) {
-      alert('No valid IP addresses found!');
-      return;
-    }
+    if (validIPs.length === 0) return;
 
     setLoading(true);
     setResults([]);
 
     const fetchedResults = [];
-    for (const ip of ipList) {
+    for (const ip of validIPs) {
       try {
         const res = await fetch(https://ipapi.co//json/);
         const data = await res.json();
@@ -85,80 +106,107 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-900 text-slate-100 p-6 md:p-12">
-      <div className="max-w-5xl mx-auto space-y-8">
-        <header className="flex items-center gap-3 border-b border-slate-800 pb-6">
-          <Globe className="w-8 h-8 text-indigo-400" />
-          <h1 className="text-2xl font-bold tracking-tight">Bulk IP Geolocation Finder</h1>
+    <main className="min-h-screen bg-[#090d16] text-slate-100 p-6 md:p-12 font-sans">
+      <div className="max-w-5xl mx-auto space-y-6">
+        <header className="flex items-center justify-between border-b border-slate-800/80 pb-5">
+          <div className="flex items-center gap-3">
+            <Globe className="w-7 h-7 text-indigo-400" />
+            <h1 className="text-xl font-bold tracking-wide">Bulk IP Geolocation Finder</h1>
+          </div>
         </header>
 
-        <div className="space-y-4">
-          <label className="block text-sm font-medium text-slate-400">
-            Paste IPs line-by-line (one per line):
-          </label>
+        <div className="bg-[#0f172a]/60 border border-slate-800/80 rounded-xl p-6 space-y-5 backdrop-blur-sm">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-md font-semibold text-slate-200">Paste Bulk IP Addresses</h2>
+              <p className="text-xs text-slate-400">Accepts IPv4 and IPv6 addresses with or without ports (line-by-line).</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setInputText(103.101.54.181:58050\n79.181.186.115:33945\n[2001:8a0:72fb:0:7d72:3e98:5f22:ebff]:9505)}
+                className="text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 px-3 py-1.5 rounded-md transition"
+              >
+                Load Sample Data
+              </button>
+              <button
+                onClick={() => { setInputText(''); setResults([]); }}
+                className="text-xs bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40 px-3 py-1.5 rounded-md transition flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Clear All
+              </button>
+            </div>
+          </div>
+
           <textarea
-            rows={10}
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder={122.60.224.71:38976\n[2800:300:6a13:2400:1525:346b:6388:213e]:6692}
+            rows={8}
+            className="w-full bg-[#070a12] border border-slate-800 rounded-lg p-4 font-mono text-sm text-slate-200 focus:outline-none focus:border-indigo-500/80 focus:ring-1 focus:ring-indigo-500/80"
+            placeholder="Paste IPv4/IPv6 addresses here..."
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
           />
-          <div className="flex gap-3">
+
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-3 text-xs font-mono">
+              <span className={px-3 py-1.5 rounded-full border }>
+                ? Valid IPs: {validIPs.length}
+              </span>
+              <span className={px-3 py-1.5 rounded-full border }>
+                ?? Invalid Entries: {invalidEntries.length}
+              </span>
+            </div>
+
             <button
               onClick={handleLookup}
-              disabled={loading}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-lg font-medium transition disabled:opacity-50"
+              disabled={loading || validIPs.length === 0}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2.5 rounded-lg transition shadow-md"
             >
               {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              {loading ? 'Processing...' : 'Lookup Locations'}
+              {loading ? 'Fetching...' : 'Fetch Geolocation Data'}
             </button>
-            <button
-              onClick={() => { setInputText(''); setResults([]); }}
-              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-lg transition"
-            >
-              <Trash2 className="w-4 h-4" /> Clear
-            </button>
-            {results.length > 0 && (
-              <button
-                onClick={downloadCSV}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-lg font-medium transition"
-              >
-                <Download className="w-4 h-4" /> Export CSV
-              </button>
-            )}
           </div>
         </div>
 
         {results.length > 0 && (
-          <div className="overflow-x-auto border border-slate-800 rounded-lg">
-            <table className="w-full text-left text-sm text-slate-300">
-              <thead className="bg-slate-800 text-slate-400 border-b border-slate-700">
-                <tr>
-                  <th className="p-3">IP Address</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3">Country</th>
-                  <th className="p-3">City / Region</th>
-                  <th className="p-3">Organization</th>
-                  <th className="p-3">Coordinates</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {results.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-slate-800/50">
-                    <td className="p-3 font-mono text-indigo-300">{item.ip}</td>
-                    <td className="p-3">
-                      <span className={px-2 py-1 rounded text-xs }>
-                        {item.status}
-                      </span>
-                    </td>
-                    <td className="p-3">{item.country || '-'}</td>
-                    <td className="p-3">{item.city ? ${item.city},  : '-'}</td>
-                    <td className="p-3">{item.org || '-'}</td>
-                    <td className="p-3 font-mono text-xs">{item.lat ? ${item.lat},  : '-'}</td>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-md font-semibold text-slate-200">Results ({results.length})</h3>
+              <button
+                onClick={downloadCSV}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-4 py-2 rounded-lg transition"
+              >
+                <Download className="w-3.5 h-3.5" /> Export CSV
+              </button>
+            </div>
+            <div className="overflow-x-auto border border-slate-800 rounded-xl bg-[#0f172a]/40 backdrop-blur-sm">
+              <table className="w-full text-left text-sm text-slate-300">
+                <thead className="bg-[#070a12] text-slate-400 border-b border-slate-800 text-xs font-mono">
+                  <tr>
+                    <th className="p-3.5">IP Address</th>
+                    <th className="p-3.5">Status</th>
+                    <th className="p-3.5">Country</th>
+                    <th className="p-3.5">City / Region</th>
+                    <th className="p-3.5">Organization</th>
+                    <th className="p-3.5">Coordinates</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {results.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-slate-800/30">
+                      <td className="p-3.5 font-mono text-indigo-300">{item.ip}</td>
+                      <td className="p-3.5">
+                        <span className={px-2 py-0.5 rounded text-xs }>
+                          {item.status}
+                        </span>
+                      </td>
+                      <td className="p-3.5">{item.country || '-'}</td>
+                      <td className="p-3.5">{item.city ? ${item.city},  : '-'}</td>
+                      <td className="p-3.5">{item.org || '-'}</td>
+                      <td className="p-3.5 font-mono text-xs text-slate-400">{item.lat ? ${item.lat},  : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
