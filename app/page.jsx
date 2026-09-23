@@ -7,35 +7,49 @@ export default function Home() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const parseIPs = (text) => {
-    // Regex matches IPv4 and IPv6 (inside brackets or standalone), ignoring port numbers
-    const ipv4Regex = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g;
-    const ipv6Regex = /\[?([0-9a-fA-F]{1,4}:[0-9a-fA-F:]+)\]?(?::\d+)?/g;
+  const parseLineByLine = (text) => {
+    const lines = text.split('\n');
+    const cleanedIPs = [];
 
-    const matches = [];
-    let match;
+    for (let line of lines) {
+      line = line.trim();
+      if (!line) continue;
 
-    // Extract IPv4
-    while ((match = ipv4Regex.exec(text)) !== null) {
-      matches.push(match[0]);
-    }
+      let ip = line;
 
-    // Extract IPv6
-    while ((match = ipv6Regex.exec(text)) !== null) {
-      let ip = match[1] || match[0];
-      ip = ip.replace(/^\[\vert{}\]$/g, '').split(']:')[0];
-      if (ip.includes(':') && !matches.includes(ip)) {
-        matches.push(ip);
+      // Handle IPv6 inside brackets with port: [2800:300::1]:6692
+      if (line.startsWith('[')) {
+        const match = line.match(/^\[([a-fA-F0-9:]+)\](?::\d+)?$/);
+        if (match) {
+          ip = match[1];
+        }
+      } 
+      // Handle IPv4 with port: 122.60.224.71:38976
+      else if (line.includes('.')) {
+        ip = line.split(':')[0];
+      }
+      // Handle standard IPv6 with port: 2001:db8::1:8080
+      else if (line.includes(':')) {
+        const parts = line.split(':');
+        // If last part is a port number (5 digits or fewer)
+        if (parts.length > 2 && /^\d{1,5}$/.test(parts[parts.length - 1])) {
+          parts.pop();
+          ip = parts.join(':');
+        }
+      }
+
+      if (ip && !cleanedIPs.includes(ip)) {
+        cleanedIPs.push(ip);
       }
     }
 
-    return Array.from(new Set(matches));
+    return cleanedIPs;
   };
 
   const handleLookup = async () => {
-    const ipList = parseIPs(inputText);
+    const ipList = parseLineByLine(inputText);
     if (ipList.length === 0) {
-      alert('No valid IPv4 or IPv6 addresses found!');
+      alert('No valid IP addresses found line-by-line!');
       return;
     }
 
@@ -94,12 +108,12 @@ export default function Home() {
 
         <div className="space-y-4">
           <label className="block text-sm font-medium text-slate-400">
-            Paste IPs (supports IP:Port format like 122.60.224.71:38976 or [2800:300::1]:6692):
+            Paste IPs line-by-line (one per line):
           </label>
           <textarea
-            rows={8}
+            rows={10}
             className="w-full bg-slate-800 border border-slate-700 rounded-lg p-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="Paste bulk IPs here..."
+            placeholder={122.60.224.71:38976\n[2800:300:6a13:2400:1525:346b:6388:213e]:6692\n31.217.177.134:12833}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
           />
